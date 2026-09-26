@@ -1,0 +1,43 @@
+{
+  "name": "@decomm/task",
+  "version": "1.0.0",
+  "license": "MIT",
+  "exports": {
+    ".": "./main.ts",
+    "./init": "./init.ts"
+  },
+  "publish": {
+    "include": [
+      "main.ts",
+      "args.ts",
+      "store.ts",
+      "ui.ts",
+      "init.ts",
+      "task.sh",
+      "README.md",
+      "LICENSE",
+      "deno.json",
+      "jsr.json"
+    ]
+  },
+  "unstable": ["kv"],
+  "tasks": {
+    "task": "deno run --unstable-kv --allow-read --allow-write --allow-net --allow-env=TASK_DIR main.ts",
+    "dev": "deno run --unstable-kv --allow-read --allow-write --allow-net --allow-env=TASK_DIR --watch main.ts serve",
+    "compile": "mkdir -p bin && deno compile --unstable-kv --allow-read --allow-write --allow-net --allow-env=TASK_DIR --output bin/task main.ts",
+    "test": "deno test --unstable-kv --allow-read --allow-write --allow-net --allow-env --allow-run",
+    "check": "deno check main.ts args.ts store.ts ui.ts init.ts",
+    "fmt": "deno fmt",
+    "lint": "deno lint"
+  },
+  "imports": {
+    "@std/assert": "jsr:@std/assert@^1.0.19"
+  },
+  "compilerOptions": {
+    "strict": true
+  },
+  "fmt": {
+    "lineWidth": 100,
+    "indentWidth": 2
+  }
+}
