@@ -27,3 +27,27 @@ jobs:
 
       - name: Publish dry-run
         run: deno publish --dry-run
+
+      - name: Remote init regression (init.ts served over HTTP, like JSR)
+        run: |
+          set -euo pipefail
+          TOOL=task
+          FILES="main.ts args.ts store.ts ui.ts task.sh deno.json README.md LICENSE"
+          REPO="$PWD"
+          STAGE="$(mktemp -d)"
+          OUT="$(mktemp -d)"
+          # Serve only the JSR publish set, so a file init needs but JSR lacks fails here too.
+          jq -r '.publish.include[]' deno.json | xargs -I{} cp {} "$STAGE/"
+          deno run --no-config --allow-net --allow-read --allow-sys \
+            jsr:@std/http@^1/file-server --host 127.0.0.1 --port 8765 "$STAGE" &
+          SERVER=$!
+          trap 'kill "$SERVER" 2>/dev/null || true' EXIT
+          for _ in $(seq 100); do
+            curl -sf -o /dev/null http://127.0.0.1:8765/init.ts && break
+            sleep 0.2
+          done
+          cd "$OUT"
+          deno run -A --reload=http://127.0.0.1:8765 http://127.0.0.1:8765/init.ts "./$TOOL"
+          for f in $FILES; do cmp "$REPO/$f" "$OUT/$TOOL/$f"; done
+          test -x "$OUT/$TOOL/$TOOL.sh"
+          "./$TOOL/$TOOL.sh" --help
