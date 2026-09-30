@@ -43,6 +43,25 @@ const FILES = [
 ] as const;
 
 /**
+ * Read one of this package's files next to `init.ts`. Works from a local
+ * checkout (`file:`) and from JSR or any other `http(s):` URL, where there is no
+ * directory on disk to read from.
+ */
+const readSource = async (name: string): Promise<Uint8Array> => {
+  const url = new URL(name, import.meta.url);
+  if (url.protocol === "file:") return await Deno.readFile(url);
+  if (url.protocol === "http:" || url.protocol === "https:") {
+    const response = await fetch(url);
+    if (!response.ok) {
+      await response.body?.cancel();
+      throw new Error(`Could not fetch ${url.href}: ${response.status} ${response.statusText}`);
+    }
+    return new Uint8Array(await response.arrayBuffer());
+  }
+  throw new Error(`init cannot read its files from a ${url.protocol} URL`);
+};
+
+/**
  * Write a self-contained task tree into `directory`.
  *
  * @param directory Destination folder (created if missing). Relative paths are
@@ -55,8 +74,10 @@ export const init = async (
   options: { force?: boolean } = {},
 ): Promise<void> => {
   const root = resolveDir(directory);
-  const here = import.meta.dirname;
-  if (!here) throw new Error("init needs a file path (not a blob URL)");
+  // Read everything before touching the destination, so a failed fetch writes nothing.
+  const sources = await Promise.all(
+    FILES.map(async (name) => [name, await readSource(name)] as const),
+  );
 
   await Deno.mkdir(root, { recursive: true });
   const existing = [...Deno.readDirSync(root)];
@@ -68,8 +89,7 @@ export const init = async (
     if (!ok) throw new Error("Directory is not empty, aborting.");
   }
 
-  for (const name of FILES) {
-    const bytes = await Deno.readFile(join(here, name));
+  for (const [name, bytes] of sources) {
     await Deno.writeFile(join(root, name), bytes);
   }
   await Deno.chmod(join(root, "task.sh"), 0o755);
